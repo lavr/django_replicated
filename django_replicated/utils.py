@@ -10,6 +10,12 @@ from django.core import urlresolvers
 from .db_utils import db_is_alive, db_is_not_read_only
 
 
+REPLICATED_SELECT_READ_ONLY = getattr(settings, 'REPLICATED_SELECT_READ_ONLY', False)
+REPLICATED_READ_ONLY_DOWNTIME = getattr(settings, 'REPLICATED_READ_ONLY_DOWNTIME', 20)
+REPLICATED_READ_ONLY_TRIES = getattr(settings, 'REPLICATED_READ_ONLY_TRIES', 1)
+REPLICATED_VIEWS_OVERRIDES = getattr(settings, 'REPLICATED_VIEWS_OVERRIDES', {})
+
+
 def _get_func_import_path(func):
     '''
     Returns import path of a class method or a module-level funtion.
@@ -26,13 +32,11 @@ def check_state_override(request, state):
     if request.COOKIES.get('just_updated') == 'true':
         return 'master'
 
-    overrides = getattr(settings, 'REPLICATED_VIEWS_OVERRIDES', {})
-
-    if overrides:
+    if REPLICATED_VIEWS_OVERRIDES:
         match = urlresolvers.resolve(request.path_info)
         import_path = _get_func_import_path(match.func)
 
-        for lookup_view, forced_state in overrides.iteritems():
+        for lookup_view, forced_state in REPLICATED_VIEWS_OVERRIDES.iteritems():
             if match.url_name == lookup_view or import_path == lookup_view:
                 state = forced_state
                 break
@@ -56,15 +60,11 @@ def handle_updated_redirect(request, response):
 
 def is_service_read_only():
     from django.db import DEFAULT_DB_ALIAS
-
-    USE_SELECT = getattr(settings, 'REPLICATED_SELECT_READ_ONLY', False)
-
-    check_method = db_is_not_read_only if USE_SELECT else db_is_alive
-
+    check_method = db_is_not_read_only if REPLICATED_SELECT_READ_ONLY else db_is_alive
     return not check_method(
         db_name=DEFAULT_DB_ALIAS,
-        cache_seconds=getattr(settings, 'REPLICATED_READ_ONLY_DOWNTIME', 20),
-        number_of_tries=getattr(settings, 'REPLICATED_READ_ONLY_TRIES', 1),
+        cache_seconds=REPLICATED_READ_ONLY_DOWNTIME,
+        number_of_tries=REPLICATED_READ_ONLY_TRIES,
     )
 
 

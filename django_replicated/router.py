@@ -14,7 +14,8 @@ class ReplicationRouter(object):
         self._context = local()
         self.DEFAULT_DB_ALIAS = DEFAULT_DB_ALIAS
         self.DOWNTIME = getattr(settings, 'DATABASE_DOWNTIME', 60)
-        self.SLAVES = getattr(settings, 'DATABASE_SLAVES', [DEFAULT_DB_ALIAS])
+        self.SLAVES = getattr(settings, 'DATABASE_SLAVES', [DEFAULT_DB_ALIAS])[:]
+        random.shuffle(self.SLAVES)
 
     def _init_context(self):
         self._context.state_stack = []
@@ -76,10 +77,7 @@ class ReplicationRouter(object):
         if self.state() in self.context.chosen:
             return self.context.chosen[self.state()]
 
-        slaves = self.SLAVES[:]
-        random.shuffle(slaves)
-
-        for slave in slaves:
+        for slave in self.SLAVES:
             if self.is_alive(slave):
                 chosen = slave
                 break
